@@ -1,0 +1,359 @@
+<!--
+@license
+Copyright (c) 2016 The Polymer Project Authors. All rights reserved.
+This code may only be used under the BSD style license found at http://polymer.github.io/LICENSE.txt
+The complete set of authors may be found at http://polymer.github.io/AUTHORS.txt
+The complete set of contributors may be found at http://polymer.github.io/CONTRIBUTORS.txt
+Code distributed by Google as part of the polymer project is also
+subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
+-->
+
+<link rel="import" href="../bower_components/polymer/polymer.html">
+<link rel="import" href="shared-styles.html">
+
+<link rel="import" href="../bower_components/paper-material/paper-material.html">
+<link rel="import" href="../bower_components/paper-icon-button/paper-icon-button.html">
+
+<link rel="import" href="../bower_components/paper-input/paper-input.html">
+<link rel="import" href="../bower_components/paper-button/paper-button.html">
+<link rel="import" href="../bower_components/paper-fab/paper-fab.html">
+<link rel="import" href="../bower_components/paper-dialog/paper-dialog.html">
+<link rel="import" href="../bower_components/paper-dialog-scrollable/paper-dialog-scrollable.html">
+<link rel="import" href="../bower_components/paper-listbox/paper-listbox.html">
+<link rel="import" href="../bower_components/paper-item/paper-item.html">
+<link rel="import" href="../bower_components/paper-toggle-button/paper-toggle-button.html">
+<link rel="import" href="../bower_components/paper-dropdown-menu/paper-dropdown-menu.html">
+<link rel="import" href="../bower_components/paper-radio-group/paper-radio-group.html">
+<link rel="import" href="../bower_components/paper-radio-button/paper-radio-button.html">
+
+<link href="../bower_components/iron-icons/iron-icons.html" rel="import">
+
+<dom-module id="my-view1">
+    <template>
+        <style include="shared-styles">
+            :host {
+                display: block;
+
+                padding: 10px;
+            }
+
+            .flex-container {
+                display: flex;
+                flex-direction: column;
+            }
+
+            .body {
+                margin: 0;
+                background-color: #ededed;
+            }
+
+            #divider {
+                height: 1px;
+                background: #ededed;
+            }
+
+            .chatContent {
+                height: 100%;
+                background-color: white;
+                left: 50%;
+                width: 50%;
+                -webkit-transform: translate(-50%, -0%);
+                transform: translate(-50%, -0%);
+
+                min-height: 100vh;
+                min-width: 300px;
+            }
+
+            #purchaseButton {
+                position: fixed;
+                right: 24px;
+                bottom: 24px;
+            }
+        </style>
+
+        <div class="body">
+            <paper-dialog id="purchaseDialog">
+                <h2>Покупка</h2>
+                <paper-dialog-scrollable>
+                    <paper-input always-float-label label="Название" id="name"></paper-input>
+                    <div>
+                        <paper-input always-float-label label="Количество" id="count" style="width: 70%; float: left"></paper-input>
+                        <!--<paper-dropdown-menu style="width: 20%; float: right" id="countType">-->
+                            <!--<paper-listbox class="dropdown-content" selected="0" id="countTypeList">-->
+                                <!--<paper-item>шт</paper-item>-->
+                                <!--<paper-item>кг</paper-item>-->
+                                <!--<paper-item>г</paper-item>-->
+                                <!--<paper-item>л</paper-item>-->
+                            <!--</paper-listbox>-->
+                        <!--</paper-dropdown-menu>-->
+                        <paper-radio-group selected="a">
+                            <paper-radio-button name="a" id="a">шт</paper-radio-button>
+                            <paper-radio-button name="b" id="b">кг</paper-radio-button>
+                            <paper-radio-button name="c" id="c">г</paper-radio-button>
+                            <paper-radio-button name="d" id="d">л</paper-radio-button>
+                        </paper-radio-group>
+                    </div>
+                    <paper-input always-float-label label="Цена" id="cost" style="clear: both"></paper-input>
+                    <div>
+                        <p style="width: 70%; float: left">Куплен</p>
+                        <paper-toggle-button style="width: 20%; float: right; padding: 14px"
+                                             align="right" id="purchased"></paper-toggle-button>
+                    </div>
+                    <paper-input always-float-label label="Комментарий" id="comment" style="clear: both"></paper-input>
+                    <div>
+                        <p style="width: 70%; float: left">Категория</p>
+                        <p style="width: 20%; float: right; padding: 14px" align="right" id="category"></p>
+                    </div>
+                </paper-dialog-scrollable>
+                <div class="buttons">
+                    <paper-button dialog-confirm autofocus id="save">Сохранить</paper-button>
+                </div>
+            </paper-dialog>
+
+            <paper-dialog id="categoriesDialog" style="min-width: 20%">
+                <h2>Категория</h2>
+                <paper-dialog-scrollable style="max-height: 50%">
+                    <ul class="list" style="list-style-type: none; -webkit-padding-start: 0" id="categoriesList">
+                    </ul>
+                </paper-dialog-scrollable>
+            </paper-dialog>
+
+            <div class="flex-container">
+                <paper-material elevation="3" class="chatContent">
+                    <ul id="purchasesList" class="list"
+                        style="list-style-type: none; -webkit-padding-start: 0">
+                    </ul>
+                </paper-material>
+            </div>
+
+            <paper-fab id="purchaseButton" icon="add">
+            </paper-fab>
+        </div>
+    </template>
+
+    <script>
+        var indexedDB;
+        var IDBTransaction;
+
+        Polymer({
+            is: 'my-view1',
+
+            properties: {
+                page: {
+                    type: String,
+                    reflectToAttribute: true,
+                    observer: '_pageChanged'
+                }
+            },
+
+            ready: function () {
+                console.log("purchases ready");
+                indexedDB = window.indexedDB || window.mozIndexedDB || window.webkitIndexedDB || window.msIndexedDB;
+                IDBTransaction = window.IDBTransaction || window.webkitIDBTransaction || window.msIDBTransaction;
+                var _this = this;
+
+                this.$.purchaseButton.onclick = function () {
+                    console.log("my 1 view clicked");
+                    showCategoriesDialog1(_this);
+                    return false;
+                };
+
+                reloadPurchases1(this);
+            },
+
+            attributeChanged: function () {
+                console.log("purchases opened");
+                reloadPurchases1(this);
+            }
+        });
+
+        function connectDB1(f) {
+            var request = indexedDB.open("myBase2", 1);
+            request.onerror = function (err) {
+                console.log(err);
+            };
+            request.onsuccess = function () {
+                f(request.result);
+            };
+            request.onupgradeneeded = function (e) {
+                e.currentTarget.result.createObjectStore("purchasesStore", {keyPath: "id", autoIncrement: true});
+                e.currentTarget.result.createObjectStore("categoriesStore", {keyPath: "name"});
+                connectDB1(f);
+            }
+        }
+
+        function saveObject1(category, store) {
+            connectDB1(function (db) {
+                var request = db.transaction([store], "readwrite").objectStore(store).put(category);
+                request.onerror = logerr;
+                request.onsuccess = function () {
+                    return request.result;
+                }
+            });
+        }
+
+        function deleteObject1(key, store) {
+            connectDB1(function (db) {
+                var request = db.transaction([store], "readwrite").objectStore(store).delete(key);
+                request.onerror = logerr;
+                request.onsuccess = function () {
+                }
+            });
+        }
+
+        function reloadPurchases1(_this) {
+            _this.$.purchasesList.innerHTML = "";
+            connectDB1(function (db) {
+                var rows = [],
+                    store = db.transaction(["purchasesStore"], "readonly").objectStore("purchasesStore");
+
+                store.openCursor().onsuccess = function (e) {
+                    var cursor = e.target.result;
+                    if (cursor) {
+                        rows.push(cursor.value);
+                        cursor.continue();
+                    }
+                    else {
+                        for (var i = 0; i < rows.length; i++) {
+                            var editId = 'editt' + i;
+                            var deleteId = 'deletid' + i;
+                            var purchase = rows[i];
+                            var li = '<li style="padding: 16px">'
+                                + '<p style="float: left; width: 100%">' + purchase.name + ' ' + purchase.count + ' ' + purchase.countType
+                                + '<paper-icon-button icon="create" style="float: right;" id="' + editId + '"></paper-icon-button>'
+                                + '<paper-icon-button icon="delete" style="float: right;" id="' + deleteId + '"></paper-icon-button>'
+                                + '</p>'
+                                + '</li>';
+                            _this.$.purchasesList.innerHTML = _this.$.purchasesList.innerHTML + li + '<li id="divider" style="clear: both">';
+                        }
+                        for (var j = 0; j < rows.length; j++) {
+                            configureEditButton1(_this, Polymer.dom(_this.root).querySelector('#' + 'editt' + j), rows[j]);
+                            configureDeleteButton1(_this, Polymer.dom(_this.root).querySelector('#' + 'deletid' + j), rows[j]);
+                        }
+                    }
+                };
+            });
+        }
+
+        function configureEditButton1(_this, button, purchase) {
+            button.addEventListener('click', function () {
+                console.log('onedit click');
+                showPurchaseDialogWith1(_this, purchase);
+            });
+        }
+
+        function configureDeleteButton1(_this, button, purchase) {
+            button.onclick = function () {
+                deleteObject1(purchase.id, "purchasesStore");
+                reloadPurchases1(_this);
+            };
+        }
+
+        function showCategoriesDialog1(_this) {
+            _this.$.categoriesList.innerHTML = "";
+            connectDB1(function (db) {
+                var rows = [],
+                    store = db.transaction(["categoriesStore"], "readonly").objectStore("categoriesStore");
+
+                store.openCursor().onsuccess = function (e) {
+                    var cursor = e.target.result;
+                    if (cursor) {
+                        rows.push(cursor.value);
+                        cursor.continue();
+                    }
+                    else {
+                        for (var i = 0; i < rows.length; i++) {
+                            var id = 'category' + i;
+                            _this.$.categoriesList.innerHTML = _this.$.categoriesList.innerHTML + '<paper-item id="' + id + '">' + rows[i].name + '</paper-item>';
+                        }
+                        for (i = 0; i < rows.length; i++) {
+                            configureItem1(_this, Polymer.dom(_this.root).querySelector('#' + 'category' + i), rows[i]);
+                        }
+                        _this.$.categoriesDialog.toggle();
+                    }
+                };
+            });
+        }
+
+        function configureItem1(_this, item, category) {
+            item.onclick = function () {
+                showPurchaseDialogWithCategory1(_this, category);
+                _this.$.categoriesDialog.close();
+            }
+        }
+
+        function showPurchaseDialogWith1(_this, purchase) {
+            clearPurchasesDialog1(_this, purchase);
+
+            _this.$.name.value = purchase.name;
+            _this.$.count.value = purchase.count;
+            _this.$.cost.value = purchase.cost;
+            _this.$.purchased.checked = purchase.purchased;
+            _this.$.comment.value = purchase.comment;
+            _this.$.category.innerHTML = purchase.category;
+
+
+            _this.$.a.checked = purchase.countType === 'шт';
+            if (purchase.countType === 'кг') {
+                _this.$.b.checked = true;
+            }
+            if (purchase.countType === 'г') {
+                _this.$.c.checked = true;
+            }
+            if (purchase.countType === 'л') {
+                _this.$.d.checked = true;
+            }
+
+            _this.$.purchaseDialog.toggle();
+        }
+
+        function showPurchaseDialogWithCategory1(_this, category) {
+            clearPurchasesDialog1(_this, null);
+            _this.$.category.innerHTML = category.name;
+            _this.$.purchaseDialog.toggle();
+        }
+
+        function clearPurchasesDialog1(_this, oldPurchase) {
+            _this.$.name.value = "";
+            _this.$.count.value = "";
+            _this.$.cost.value = "";
+            _this.$.purchased.checked = false;
+            _this.$.comment.value = "";
+            _this.$.category.innerHTML = "";
+            _this.$.a.checked = true;
+            _this.$.b.checked = false;
+            _this.$.c.checked = false;
+            _this.$.d.checked = false;
+
+            _this.$.save.onclick = function () {
+                var countType;
+                if (_this.$.a.checked) {
+                    countType = 'шт';
+                }
+                if (_this.$.b.checked) {
+                    countType = 'кг';
+                }
+                if (_this.$.c.checked) {
+                    countType = 'г';
+                }
+                if (_this.$.d.checked) {
+                    countType = 'л';
+                }
+                var purchase = {
+                    name: _this.$.name.value,
+                    count: _this.$.count.value,
+                    countType: countType,
+                    cost: _this.$.cost.value,
+                    purchased: _this.$.purchased.checked,
+                    comment: _this.$.comment.value,
+                    category: _this.$.category.innerHTML
+                };
+                if (oldPurchase) {
+                    deleteObject1(oldPurchase.id, "purchasesStore");
+                }
+                saveObject1(purchase, "purchasesStore");
+                reloadPurchases1(_this);
+            };
+        }
+    </script>
+</dom-module>

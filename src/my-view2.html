@@ -1,0 +1,234 @@
+<!--
+@license
+Copyright (c) 2016 The Polymer Project Authors. All rights reserved.
+This code may only be used under the BSD style license found at http://polymer.github.io/LICENSE.txt
+The complete set of authors may be found at http://polymer.github.io/AUTHORS.txt
+The complete set of contributors may be found at http://polymer.github.io/CONTRIBUTORS.txt
+Code distributed by Google as part of the polymer project is also
+subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
+-->
+
+<link rel="import" href="../bower_components/polymer/polymer.html">
+<link rel="import" href="shared-styles.html">
+
+<link rel="import" href="../bower_components/paper-material/paper-material.html">
+<link rel="import" href="../bower_components/paper-icon-button/paper-icon-button.html">
+
+<link rel="import" href="../bower_components/paper-input/paper-input.html">
+<link rel="import" href="../bower_components/paper-button/paper-button.html">
+<link rel="import" href="../bower_components/paper-fab/paper-fab.html">
+<link rel="import" href="../bower_components/paper-dialog/paper-dialog.html">
+<link rel="import" href="../bower_components/paper-dialog-scrollable/paper-dialog-scrollable.html">
+<link rel="import" href="../bower_components/paper-listbox/paper-listbox.html">
+<link rel="import" href="../bower_components/paper-item/paper-item.html">
+<link rel="import" href="../bower_components/paper-toggle-button/paper-toggle-button.html">
+<link rel="import" href="../bower_components/paper-dropdown-menu/paper-dropdown-menu.html">
+
+<link href="../bower_components/iron-icons/iron-icons.html" rel="import">
+
+<dom-module id="my-view2">
+    <template>
+        <style include="shared-styles">
+            :host {
+                display: block;
+
+                padding: 10px;
+            }
+
+            .flex-container {
+                display: flex;
+                flex-direction: column;
+            }
+
+            .body {
+                margin: 0;
+                background-color: #ededed;
+            }
+
+            #divider {
+                height: 1px;
+                background: #ededed;
+            }
+
+            .chatContent {
+                height: 100%;
+                background-color: white;
+                left: 50%;
+                width: 50%;
+                -webkit-transform: translate(-50%, -0%);
+                transform: translate(-50%, -0%);
+
+                min-height: 100vh;
+                min-width: 300px;
+            }
+
+            #categoriesButton {
+                position: fixed;
+                right: 24px;
+                bottom: 24px;
+            }
+        </style>
+
+        <div class="body">
+            <paper-dialog id="addCategoryDialog">
+                <h2>Категория</h2>
+                <paper-dialog-scrollable>
+                    <paper-input always-float-label label="Название категории" id="categoryName"></paper-input>
+                </paper-dialog-scrollable>
+                <div class="buttons">
+                    <paper-button dialog-confirm autofocus id="saveCategory">Сохранить</paper-button>
+                </div>
+            </paper-dialog>
+
+            <div class="flex-container">
+                <paper-material elevation="3" class="chatContent">
+                    <ul id="categoriesList" class="list"
+                        style="list-style-type: none; -webkit-padding-start: 0">
+                    </ul>
+                </paper-material>
+            </div>
+
+            <paper-fab id="categoriesButton" icon="add">
+            </paper-fab>
+        </div>
+    </template>
+
+    <script>
+        Polymer({
+
+            properties: {
+                page: {
+                    type: String,
+                    reflectToAttribute: true,
+                    observer: '_pageChanged'
+                }
+            },
+
+            is: 'my-view2',
+
+            ready: function () {
+                console.log("categories ready");
+
+                indexedDB = window.indexedDB || window.mozIndexedDB || window.webkitIndexedDB || window.msIndexedDB;
+                IDBTransaction = window.IDBTransaction || window.webkitIDBTransaction || window.msIDBTransaction;
+
+                reloadCategories(this);
+
+                var _this = this;
+                this.$.categoriesButton.onclick = function () {
+                    console.log("my 2 view clicked");
+                    showCategoriesDialog(_this, null);
+                    return false;
+                };
+            },
+
+            attributeChanged: function () {
+                console.log("categories opened");
+                reloadCategories(this);
+            }
+        });
+
+        function connectDB(f) {
+            var request = indexedDB.open("myBase2", 1);
+            request.onerror = function (err) {
+                console.log(err);
+            };
+            request.onsuccess = function () {
+                f(request.result);
+            };
+            request.onupgradeneeded = function (e) {
+                e.currentTarget.result.createObjectStore("purchasesStore", {keyPath: "id", autoIncrement: true});
+                e.currentTarget.result.createObjectStore("categoriesStore", {keyPath: "name"});
+                connectDB(f);
+            }
+        }
+
+        function saveObject(category, store) {
+            connectDB(function (db) {
+                var request = db.transaction([store], "readwrite").objectStore(store).put(category);
+                request.onerror = logerr;
+                request.onsuccess = function () {
+                    return request.result;
+                }
+            });
+        }
+
+        function deleteObject(key, store) {
+            connectDB(function (db) {
+                var request = db.transaction([store], "readwrite").objectStore(store).delete(key);
+                request.onerror = logerr;
+                request.onsuccess = function () {
+                }
+            });
+        }
+
+        function reloadCategories(_this) {
+            _this.$.categoriesList.innerHTML = "";
+            connectDB(function (db) {
+                var rows = [],
+                    store = db.transaction(["categoriesStore"], "readonly").objectStore("categoriesStore");
+
+                store.openCursor().onsuccess = function (e) {
+                    var cursor = e.target.result;
+                    if (cursor) {
+                        rows.push(cursor.value);
+                        cursor.continue();
+                    }
+                    else {
+                        for (var i = 0; i < rows.length; i++) {
+                            var idEdit = 'edit' + i;
+                            var idDelete = 'delete' + i;
+
+                            var li = '<li style="padding: 16px">'
+                                + '<p style="float: left; width: 100%">' + rows[i].name
+                                + '<paper-icon-button icon="create" style="float: right;" id="' + idEdit + '">' + '</paper-icon-button>'
+                                + '<paper-icon-button icon="delete" style="float: right;" id="' + idDelete + '">' + '</paper-icon-button>'
+                                + '</p>'
+                                + '</li>';
+                            li = li + '<li id="divider" style="clear: both">';
+
+                            _this.$.categoriesList.innerHTML = _this.$.categoriesList.innerHTML + li;
+                        }
+                        for (var j = 0; j < rows.length; j++) {
+                            configureEditButton(_this, Polymer.dom(_this.root).querySelector('#' + 'edit' + j), rows[j]);
+                            configureDeleteButton(_this, Polymer.dom(_this.root).querySelector('#' + 'delete' + j), rows[j]);
+                        }
+                    }
+                };
+            });
+        }
+
+        function configureEditButton(_this, button, category) {
+            console.log('configure edit button');
+            button.addEventListener('click', function () {
+                console.log('onedit click');
+                showCategoriesDialog(_this, category);
+            });
+        }
+
+        function configureDeleteButton(_this, button, category) {
+            button.onclick = function () {
+                deleteObject(category.name, "categoriesStore");
+                reloadCategories(_this);
+            };
+        }
+
+        function showCategoriesDialog(_this, category) {
+            if (!category) {
+                _this.$.categoryName.value = "";
+            } else {
+                _this.$.categoryName.value = category.name;
+            }
+            _this.$.saveCategory.onclick = function () {
+                if (category) {
+                    deleteObject(category.name, "categoriesStore");
+                }
+                if (_this.$.categoryName.value.length > 0) {
+                    saveObject({name: _this.$.categoryName.value}, "categoriesStore");
+                    reloadCategories(_this);
+                }
+            };
+            _this.$.addCategoryDialog.toggle();
+        }
+    </script>
+</dom-module>
